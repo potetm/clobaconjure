@@ -3,6 +3,26 @@
   (:require [cemerick.cljs.test :as t]
             [clobaconjure.core :as b]))
 
-(deftest foo-test
-  (testing "foo is Hello, World"
-    (is (= (b/foo) "Hello, World!"))))
+(defn expect-events [src & events-expected]
+  (let [events-found []]
+    (b/subscribe src
+                 (fn [event]
+                   (if (= event b/end)
+                     (is (= events-found events-expected))
+                     (conj events-found event))))))
+
+(deftest later
+  (testing "it should send a single event and end"
+    (expect-events (b/later 1000 "hipsta!") "hipsta!")))
+
+(deftest sequentially
+  (testing "it should send events and end"
+    (expect-events (b/sequentially 1000 ["hipsta 1" "hipsta 2"]) "hipsta 1" "hipsta 2")))
+
+(deftest empty-map
+  (testing "it should not think an empty map is b/end"
+    (expect-events (b/sequentially 1000 [{} {:not "empty"}]) {} {:not "empty"})))
+
+(deftest empty-object
+  (testing "it should not think an empty object is b/end"
+    (expect-events (b/sequentially 1000 [#js {} #js {:not "empty"}]) #js {} #js {:not "empty"})))
