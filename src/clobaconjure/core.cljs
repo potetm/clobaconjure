@@ -82,5 +82,13 @@
       (sink end))))
 
 ;; Unfortunately these are needed for testing until I can fix the js/setTimeout issues.
+;; later
 (subscribe! (later 1000 "hipsta!") #(js/console.log %))
-(subscribe! (sequentially 1000 ["hipsta1" "hipsta2" "hipsta3"]) #(js/console.log %))
+
+;; sequentially
+(subscribe! (sequentially 500 ["whoopadoo1" "woopadoo2" "woopadoo3"]) #(js/console.log %))
+
+;; mutiple subscribers
+(let [stream (sequentially 1000 ["hipsta1" "hipsta2" "hipsta3"])]
+  (subscribe! stream #(js/console.log "Balla" %))
+  (subscribe! stream #(js/console.log %)))
