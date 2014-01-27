@@ -50,3 +50,10 @@
           (b/filter even?)
           (b/map inc))
       3 5)))
+
+(deftest taking-while
+  (testing "it should take while"
+    (expect-events
+      (-> (b/from-array [1 2 3 4])
+          (b/take-while (partial > 3)))
+      1 2)))

@@ -8,16 +8,20 @@
 (def end #js ["<end>"])
 (def more #js ["<more>"])
 
+(def end? (partial = end))
+
 (defrecord EventStream [subscribe]
   ISubscribable
   (subscribe! [eventstream event]
     (subscribe event)))
 
 (defn push [subscribers event]
-  (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
-          :let [reply (s event)]]
-    (when (= reply end)
-      (swap! subscribers dissoc i))))
+  (let [remove #(vec (concat (subvec %1 0 %2)
+                             (subvec %1 (inc %2) (count %1))))]
+    (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
+            :let [reply (s event)]]
+      (when (= reply end)
+        (swap! subscribers remove i)))))
 
 (defn- make-subscribe [subscribe-prev handler subscribers]
   (fn [sink]
@@ -40,16 +44,25 @@
 
 (defn filter [es f]
   (let [handler (fn [subscribers event]
-                  (when (or (= event end) (f event))
+                  (when (or (end? event) (f event))
                     (push subscribers event)))]
     (from-eventstream es handler)))
 
 (defn map [es f]
   (let [handler (fn [subscribers event]
                   (push subscribers
-                        (if (= event end)
+                        (if (end? event)
                           event
                           (f event))))]
+    (from-eventstream es handler)))
+
+(defn take-while [es f]
+  (let [handler (fn [subscribers event]
+                  (if (or (end? event) (f event))
+                    (push subscribers event)
+                    (do
+                      (push subscribers end)
+                      end)))]
     (from-eventstream es handler)))
 
 (defn later [delay value]
