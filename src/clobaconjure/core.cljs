@@ -19,38 +19,38 @@
     (when (= reply end)
       (swap! subscribers dissoc i))))
 
-(defn- subscribe* [subscribe handler subscribers]
+(defn- make-subscribe [subscribe-prev handler subscribers]
   (fn [sink]
     (swap! subscribers conj sink)
     (when (= (count @subscribers) 1)
-      (subscribe handler))))
+      (subscribe-prev handler))))
 
 (defn eventstream [subscribe]
   (let [subscribers (atom [])
         handler (partial push subscribers)]
-    (->EventStream (subscribe* subscribe handler subscribers))))
+    (->EventStream (make-subscribe subscribe handler subscribers))))
+
+(defn- from-eventstream [es handler]
+  (let [subscribers (atom [])]
+    (->EventStream
+      (make-subscribe
+        (:subscribe es)
+        (partial handler subscribers)
+        subscribers))))
 
 (defn filter [es f]
-  (let [subscribers (atom [])]
-    (->EventStream
-      (subscribe*
-        (:subscribe es)
-        (fn [event]
-          (when (or (= event end) (f event))
-            (push subscribers event)))
-        subscribers))))
+  (let [handler (fn [subscribers event]
+                  (when (or (= event end) (f event))
+                    (push subscribers event)))]
+    (from-eventstream es handler)))
 
 (defn map [es f]
-  (let [subscribers (atom [])]
-    (->EventStream
-      (subscribe*
-        (:subscribe es)
-        (fn [event]
-          (push subscribers
-                (if (= event end)
-                  event
-                  (f event))))
-        subscribers))))
+  (let [handler (fn [subscribers event]
+                  (push subscribers
+                        (if (= event end)
+                          event
+                          (f event))))]
+    (from-eventstream es handler)))
 
 (defn later [delay value]
   (eventstream
