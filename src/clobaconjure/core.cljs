@@ -1,25 +1,28 @@
 (ns clobaconjure.core)
 
-(defrecord EventStream [emitter sink subscribers])
+(defrecord EventStream [emitter subscribers])
 
 (def end #js ["<end>"])
 (def more #js ["<more>"])
 
 (defn eventstream [emitter]
-  (let [subscribers (atom [])
-        sink (fn [event]
-               (doseq [[s i] (map vector @subscribers (iterate inc 0))
-                       :let [reply (s event)]]
-                 (when (= reply end)
-                   (swap! subscribers dissoc i)))
-               (if (empty? @subscribers) end more))]
-    (->EventStream emitter sink subscribers)))
+  (let [subscribers (atom [])]
+    (->EventStream emitter subscribers)))
 
-(defn subscribe! [stream subscriber]
-  (let [subscribers (:subscribers stream)]
+(defn- make-sink [eventstream]
+  (let [subscribers (:subscribers eventstream)]
+    (fn [event]
+      (doseq [[s i] (map vector @subscribers (iterate inc 0))
+              :let [reply (s event)]]
+        (when (= reply end)
+          (swap! subscribers dissoc i)))
+      (if (empty? @subscribers) end more))))
+
+(defn subscribe! [eventstream subscriber]
+  (let [subscribers (:subscribers eventstream)]
     (swap! subscribers conj subscriber)
     (when (= (count @subscribers) 1)
-      ((:emitter stream) (:sink stream)))))
+      ((:emitter eventstream) (make-sink eventstream)))))
 
 (defn later [delay value]
   (eventstream
