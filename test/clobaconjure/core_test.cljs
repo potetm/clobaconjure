@@ -57,3 +57,10 @@
       (-> (b/from-array [1 2 3 4])
           (b/take-while (partial > 3)))
       1 2)))
+
+(deftest merging
+  (testing "it should be mergable"
+    (expect-events
+      (-> (b/from-array [1 2 3 4])
+          (b/merge (b/from-array [5 6 7 8])))
+      1 2 3 4 5 6 7 8)))
