@@ -46,6 +46,13 @@
               delay))]
     (eventstream #(schedule % values))))
 
+(defn from-array [values]
+  (eventstream
+    (fn [sink]
+      (doseq [v values]
+        (sink v))
+      (sink end))))
+
 ;; Unfortunately these are needed for testing until I can fix the js/setTimeout issues.
 (subscribe! (later 1000 "hipsta!") #(js/console.log %))
 (subscribe! (sequentially 1000 ["hipsta1" "hipsta2" "hipsta3"]) #(js/console.log %))

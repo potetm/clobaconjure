@@ -7,7 +7,6 @@
   (let [events-found (atom [])]
     (b/subscribe! src
                   (fn [event]
-                    (println "HELLO")
                     (if (= event b/end)
                       (is (= @events-found events-expected))
                       (swap! events-found conj event))))))
@@ -22,11 +21,13 @@
 
 (deftest empty-map
   (testing "it should not think an empty map is b/end"
-    (expect-events (b/sequentially 1000 [{} {:not "empty"}]) {} {:not "empty"})))
+    (expect-events (b/from-array [{} {:not "empty"}]) {} {:not "empty"})))
 
 (deftest empty-object
   (testing "it should not think an empty object is b/end"
-    (expect-events (b/sequentially 1000 [#js {} #js {:not "empty"}]) #js {} #js {:not "empty"})))
+    (let [empty #js {}
+          not-empty #js {:not "empty"}]
+      (expect-events (b/from-array [empty not-empty]) empty not-empty))))
 
 #_(deftest filter
   (testing "it should filter values"
