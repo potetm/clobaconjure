@@ -29,9 +29,25 @@
           not-empty #js {:not "empty"}]
       (expect-events (b/from-array [empty not-empty]) empty not-empty))))
 
-#_(deftest filter
+(deftest filtering
   (testing "it should filter values"
     (expect-events
-      (-> (b/sequentially 1000 ["a" "b" "c"])
+      (-> (b/from-array ["a" "b" "c"])
           (b/filter (partial not= "c")))
       "a" "b")))
+
+(deftest mapping
+  (testing "it should map values"
+    (expect-events
+      (-> (b/from-array [1 2 3])
+          (b/map inc))
+      2 3 4)))
+
+(deftest filter-and-map
+  (testing "it should be composable"
+    (expect-events
+      (-> (b/from-array [1 2 3 4])
+          (b/filter even?)
+          (b/map inc)
+          (b/filter (partial = 5)))
+      3 5)))

@@ -1,28 +1,53 @@
-(ns clobaconjure.core)
-
-(defrecord EventStream [emitter subscribers])
+(ns clobaconjure.core
+  (:refer-clojure :exclude [filter map merge next repeatedly take take-while])
+  (:require [cljs.core :as c]))
 
 (def end #js ["<end>"])
 (def more #js ["<more>"])
 
-(defn eventstream [emitter]
-  (let [subscribers (atom [])]
-    (->EventStream emitter subscribers)))
+(defrecord EventStream [subscribe])
 
-(defn- make-sink [eventstream]
-  (let [subscribers (:subscribers eventstream)]
-    (fn [event]
-      (doseq [[s i] (map vector @subscribers (iterate inc 0))
-              :let [reply (s event)]]
-        (when (= reply end)
-          (swap! subscribers dissoc i)))
-      (if (empty? @subscribers) end more))))
+(defn push [subscribers event]
+  (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
+          :let [reply (s event)]]
+    (when (= reply end)
+      (swap! subscribers dissoc i))))
 
-(defn subscribe! [eventstream subscriber]
-  (let [subscribers (:subscribers eventstream)]
-    (swap! subscribers conj subscriber)
+(defn- subscribe* [subscribe handler subscribers]
+  (fn [sink]
+    (swap! subscribers conj sink)
     (when (= (count @subscribers) 1)
-      ((:emitter eventstream) (make-sink eventstream)))))
+      (subscribe handler))))
+
+(defn eventstream [subscribe]
+  (let [subscribers (atom [])
+        handler (partial push subscribers)]
+    (->EventStream (subscribe* subscribe handler subscribers))))
+
+(defn subscribe! [es sink]
+  ((:subscribe es) sink))
+
+(defn filter [es f]
+  (let [subscribers (atom [])]
+    (->EventStream
+      (subscribe*
+        (:subscribe es)
+        (fn [event]
+          (when (or (= event end) (f event))
+            (push subscribers event)))
+        subscribers))))
+
+(defn map [es f]
+  (let [subscribers (atom [])]
+    (->EventStream
+      (subscribe*
+        (:subscribe es)
+        (fn [event]
+          (push subscribers
+                (if (= event end)
+                  event
+                  (f event))))
+        subscribers))))
 
 (defn later [delay value]
   (eventstream
