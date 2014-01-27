@@ -48,6 +48,5 @@
     (expect-events
       (-> (b/from-array [1 2 3 4])
           (b/filter even?)
-          (b/map inc)
-          (b/filter (partial = 5)))
+          (b/map inc))
       3 5)))

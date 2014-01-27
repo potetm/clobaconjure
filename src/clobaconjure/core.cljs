@@ -2,10 +2,16 @@
   (:refer-clojure :exclude [filter map merge next repeatedly take take-while])
   (:require [cljs.core :as c]))
 
+(defprotocol ISubscribable
+  (subscribe! [eventstream event]))
+
 (def end #js ["<end>"])
 (def more #js ["<more>"])
 
-(defrecord EventStream [subscribe])
+(defrecord EventStream [subscribe]
+  ISubscribable
+  (subscribe! [eventstream event]
+    (subscribe event)))
 
 (defn push [subscribers event]
   (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
@@ -23,9 +29,6 @@
   (let [subscribers (atom [])
         handler (partial push subscribers)]
     (->EventStream (subscribe* subscribe handler subscribers))))
-
-(defn subscribe! [es sink]
-  ((:subscribe es) sink))
 
 (defn filter [es f]
   (let [subscribers (atom [])]
