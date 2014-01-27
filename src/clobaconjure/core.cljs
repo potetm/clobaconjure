@@ -15,12 +15,52 @@
   (subscribe! [eventstream event]
     (subscribe event)))
 
+(defrecord Event [value
+                  initial?
+                  next?
+                  end?
+                  error?
+                  has-value?])
+
+(defn next [value]
+  (map->Event {:value value
+               :initial? false
+               :next? true
+               :end? false
+               :error? false
+               :has-value? true}))
+
+(defn initial [value]
+  (map->Event {:value value
+               :initial? true
+               :next? false
+               :end? false
+               :error? false
+               :has-value? true}))
+
+;; TODO: Come back and start using me!!!
+(defn end-event [value]
+  (map->Event {:value nil
+               :initial? false
+               :next? false
+               :end? true
+               :error? false
+               :has-value? false}))
+
+(defn error [value]
+  (map->Event {:value nil
+               :initial? false
+               :next? false
+               :end? true
+               :error? true
+               :has-value? false}))
+
 (defn push [subscribers event]
   (let [remove #(vec (concat (subvec %1 0 %2)
                              (subvec %1 (inc %2) (count %1))))]
     (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
             :let [reply (s event)]]
-      (when (= reply end)
+      (when (end? reply)
         (swap! subscribers remove i)))))
 
 (defn- make-subscribe [subscribe-prev handler subscribers]
