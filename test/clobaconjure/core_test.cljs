@@ -8,11 +8,11 @@
   (let [events-found (atom [])]
     (b/subscribe! src
                   (fn [event]
-                    (if (= event b/end)
+                    (if (:end? event)
                       (do
                         (is -test-ctx (= @events-found events-expected) "I need a message")
                         (done))
-                      (swap! events-found conj event))))))
+                      (swap! events-found conj (:value event)))))))
 
 (deftest ^:async later
   (testing "it should send a single event and end"
@@ -23,11 +23,11 @@
     (expect-events -test-ctx (b/sequentially 10 ["hipsta 1" "hipsta 2"]) "hipsta 1" "hipsta 2")))
 
 (deftest ^:async empty-map
-  (testing "it should not think an empty map is b/end"
+  (testing "it should not think an empty map is end"
     (expect-events -test-ctx (b/from-array [{} {:not "empty"}]) {} {:not "empty"})))
 
 (deftest ^:async empty-object
-  (testing "it should not think an empty object is b/end"
+  (testing "it should not think an empty object is end"
     (let [empty #js {}
           not-empty #js {:not "empty"}]
       (expect-events -test-ctx (b/from-array [empty not-empty]) empty not-empty))))

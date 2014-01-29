@@ -2,10 +2,10 @@
   (:refer-clojure :exclude [filter map merge next repeatedly take take-while])
   (:require [cljs.core :as c]))
 
-(def end #js ["<end>"])
+(def no-more #js ["<no-more>"])
 (def more #js ["<more>"])
 
-(def end? (partial = end))
+(def no-more? (partial = no-more))
 
 (defrecord Event [value
                   initial?
@@ -30,8 +30,7 @@
                :error?     false
                :has-value? true}))
 
-;; TODO: Come back and start using me!!!
-(defn end-event [value]
+(defn end []
   (map->Event {:value      nil
                :initial?   false
                :next?      false
@@ -39,7 +38,7 @@
                :error?     false
                :has-value? false}))
 
-(defn error [value]
+(defn error []
   (map->Event {:value      nil
                :initial?   false
                :next?      false
@@ -63,9 +62,8 @@
 (defn push [subscribers event]
   (let [remove #(vec (concat (subvec %1 0 %2)
                              (subvec %1 (inc %2) (count %1))))]
-    (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
-            :let [reply (s event)]]
-      (when (end? reply)
+    (doseq [[s i] (c/map vector @subscribers (iterate inc 0))]
+      (when (no-more? (s event))
         (swap! subscribers remove i)))))
 
 (defn- make-subscribe [subscribe-prev handler subscribers]
@@ -83,13 +81,13 @@
   (let [current-value (atom init-value)
         subscribers (atom [])
         handler (fn [event]
-                  (when (not (end? event))
+                  (when-not (:end? event)
                     (reset! current-value event))
                   (push subscribers event))
         subscribe (make-subscribe subscribe handler subscribers)
         my-subscribe (fn [sink]
                        (when @current-value
-                         (sink @current-value))
+                         (sink (initial @current-value)))
                        (subscribe sink))]
     (->Property my-subscribe)))
 
@@ -106,25 +104,26 @@
 
 (defn filter [es f]
   (let [handler (fn [subscribers event]
-                  (when (or (end? event) (f event))
-                    (push subscribers event)))]
+                  (if (or (:end? event) (f (:value event)))
+                    (push subscribers event)
+                    more))]
     (from-eventstream es handler)))
 
 (defn map [es f]
   (let [handler (fn [subscribers event]
                   (push subscribers
-                        (if (end? event)
+                        (if (:end? event)
                           event
-                          (f event))))]
+                          (next (f (:value event))))))]
     (from-eventstream es handler)))
 
 (defn take-while [es f]
   (let [handler (fn [subscribers event]
-                  (if (or (end? event) (f event))
+                  (if (or (:end? event) (f (:value event)))
                     (push subscribers event)
                     (do
-                      (push subscribers end)
-                      end)))]
+                      (push subscribers (end))
+                      no-more)))]
     (from-eventstream es handler)))
 
 (defn merge [left right]
@@ -132,9 +131,9 @@
     (fn [sink]
       (let [end-me? (atom false)
             smart-sink (fn [event]
-                         (if (end? event)
+                         (if (:end? event)
                            (if @end-me?
-                             (sink end)
+                             (sink (end))
                              (do
                                (reset! end-me? true)
                                more))
@@ -147,8 +146,8 @@
     (fn [sink]
       (js/setTimeout
         (fn []
-          (sink value)
-          (sink end))
+          (sink (next value))
+          (sink (end)))
         delay))))
 
 (defn sequentially [delay values]
@@ -157,9 +156,8 @@
             (js/setTimeout
               (fn []
                 (if (empty? values)
-                  (sink end)
-                  (do
-                    (sink (first values))
+                  (sink (end))
+                  (when-not (no-more? (sink (next (first values))))
                     (schedule sink (rest values)))))
               delay))]
     (eventstream #(schedule % values))))
@@ -168,5 +166,5 @@
   (eventstream
     (fn [sink]
       (doseq [v values]
-        (sink v))
-      (sink end))))
+        (sink (next v)))
+      (sink (end)))))
