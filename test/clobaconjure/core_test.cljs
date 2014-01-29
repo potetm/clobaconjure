@@ -80,3 +80,19 @@
       (-> (b/later 50 "b")
           (b/to-property "a"))
       "a" "b")))
+
+(deftest ^:async taking-n
+  (testing "it takes the first n values"
+    (expect-events
+      -test-ctx
+      (-> (b/from-array [1 2 3 4 5])
+          (b/take 3))
+      1 2 3)))
+
+(deftest ^:async repeating
+  (testing "it repeats"
+    (expect-events
+      -test-ctx
+      (-> (b/repeatedly 10 [1 2 3])
+          (b/take 6))
+      1 2 3 1 2 3)))

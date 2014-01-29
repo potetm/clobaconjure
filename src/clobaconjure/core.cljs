@@ -78,7 +78,7 @@
                              (subvec %1 (inc %2) (count %1))))]
     (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
             :let [reply (s event)]]
-      (when (or (no-more? reply) (:end? reply))
+      (when (or (no-more? reply) (:end? event))
         (swap! subscribers remove i))
       (if (empty? @subscribers)
         no-more
@@ -144,6 +144,15 @@
                       no-more)))]
     (from-eventstream es handler)))
 
+(defn take [es num]
+  (let [n (atom num)
+        handler (fn [subscribers event]
+                  (if (or (:end? event) (>= (swap! n dec) 0))
+                    (push subscribers event)
+                    (do (push subscribers (end))
+                        no-more)))]
+    (from-eventstream es handler)))
+
 (defn merge [left right]
   (eventstream
     (fn [sink]
@@ -172,15 +181,6 @@
         (reset! id (set-interval delay emitter))
         unbind))))
 
-(defn later [delay value]
-  (eventstream
-    (fn [sink]
-      (set-timeout
-        delay
-        (fn []
-          (sink (next value))
-          (sink (end)))))))
-
 (defn sequentially [delay values]
   (let [values (atom values)
         poll (fn []
@@ -191,17 +191,20 @@
                    (end))))]
     (from-poll delay poll)))
 
-#_(defn sequentially [delay values]
-  (letfn [(schedule
-            [sink values]
-            (set-timeout
-              delay
-              (fn []
-                (if (empty? values)
-                  (sink (end))
-                  (when-not (no-more? (sink (next (first values))))
-                    (schedule sink (rest values)))))))]
-    (eventstream #(schedule % values))))
+(defn later [delay value]
+  (sequentially delay [value]))
+
+(defn repeatedly [delay values]
+  (let [index (atom -1)
+        length (count values)
+        poll (fn []
+               (->> (mod (swap! index inc) length)
+                    (get values)
+                    next))]
+    (from-poll delay poll)))
+
+(defn interval [delay value]
+  (from-poll delay #(next value)))
 
 (defn from-array [values]
   (eventstream
