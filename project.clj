@@ -6,7 +6,7 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/clojurescript "0.0-2138"]]
   :plugins [[lein-cljsbuild "1.0.1"]
-            [com.cemerick/clojurescript.test "0.2.2"]]
+            [com.cemerick/clojurescript.test "0.3.0-SNAPSHOT"]]
   :cljsbuild {:builds
               [{:id "clobaconjure"
                 :source-paths ["src"]

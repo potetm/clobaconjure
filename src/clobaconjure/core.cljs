@@ -2,18 +2,10 @@
   (:refer-clojure :exclude [filter map merge next repeatedly take take-while])
   (:require [cljs.core :as c]))
 
-(defprotocol ISubscribable
-  (subscribe! [eventstream event]))
-
 (def end #js ["<end>"])
 (def more #js ["<more>"])
 
 (def end? (partial = end))
-
-(defrecord EventStream [subscribe]
-  ISubscribable
-  (subscribe! [eventstream event]
-    (subscribe event)))
 
 (defrecord Event [value
                   initial?
@@ -23,37 +15,50 @@
                   has-value?])
 
 (defn next [value]
-  (map->Event {:value value
-               :initial? false
-               :next? true
-               :end? false
-               :error? false
+  (map->Event {:value      value
+               :initial?   false
+               :next?      true
+               :end?       false
+               :error?     false
                :has-value? true}))
 
 (defn initial [value]
-  (map->Event {:value value
-               :initial? true
-               :next? false
-               :end? false
-               :error? false
+  (map->Event {:value      value
+               :initial?   true
+               :next?      false
+               :end?       false
+               :error?     false
                :has-value? true}))
 
 ;; TODO: Come back and start using me!!!
 (defn end-event [value]
-  (map->Event {:value nil
-               :initial? false
-               :next? false
-               :end? true
-               :error? false
+  (map->Event {:value      nil
+               :initial?   false
+               :next?      false
+               :end?       true
+               :error?     false
                :has-value? false}))
 
 (defn error [value]
-  (map->Event {:value nil
-               :initial? false
-               :next? false
-               :end? true
-               :error? true
+  (map->Event {:value      nil
+               :initial?   false
+               :next?      false
+               :end?       true
+               :error?     true
                :has-value? false}))
+
+(defprotocol ISubscribable
+  (subscribe! [eventstream sink]))
+
+(defrecord EventStream [subscribe]
+  ISubscribable
+  (subscribe! [eventstream sink]
+    (subscribe sink)))
+
+(defrecord Property [subscribe]
+  ISubscribable
+  (subscribe! [property sink]
+    (subscribe sink)))
 
 (defn push [subscribers event]
   (let [remove #(vec (concat (subvec %1 0 %2)
@@ -73,6 +78,23 @@
   (let [subscribers (atom [])
         handler (partial push subscribers)]
     (->EventStream (make-subscribe subscribe handler subscribers))))
+
+(defn property [subscribe init-value]
+  (let [current-value (atom init-value)
+        subscribers (atom [])
+        handler (fn [event]
+                  (when (not (end? event))
+                    (reset! current-value event))
+                  (push subscribers event))
+        subscribe (make-subscribe subscribe handler subscribers)
+        my-subscribe (fn [sink]
+                       (when @current-value
+                         (sink @current-value))
+                       (subscribe sink))]
+    (->Property my-subscribe)))
+
+(defn to-property [es init-value]
+  (property (:subscribe es) init-value))
 
 (defn- from-eventstream [es handler]
   (let [subscribers (atom [])]
@@ -148,15 +170,3 @@
       (doseq [v values]
         (sink v))
       (sink end))))
-
-;; Unfortunately these are needed for testing until I can fix the js/setTimeout issues.
-;; later
-(subscribe! (later 1000 "hipsta!") #(js/console.log %))
-
-;; sequentially
-(subscribe! (sequentially 500 ["whoopadoo1" "woopadoo2" "woopadoo3"]) #(js/console.log %))
-
-;; mutiple subscribers
-(let [stream (sequentially 1000 ["hipsta1" "hipsta2" "hipsta3"])]
-  (subscribe! stream #(js/console.log "Balla" %))
-  (subscribe! stream #(js/console.log %)))
