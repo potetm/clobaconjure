@@ -7,15 +7,28 @@
 
 (def no-more? (partial = no-more))
 
-(defrecord Event [value
+(defn- set-interval [delay f]
+  (js/setInterval f delay))
+
+(defn- clear-interval [id]
+  (js/clearInterval id))
+
+(defn- set-timeout [delay f]
+  (js/setTimeout f delay))
+
+(defrecord Event [event?
+                  value
                   initial?
                   next?
                   end?
                   error?
                   has-value?])
 
+(defn make-Event [map]
+  (map->Event (assoc map :event? true)))
+
 (defn next [value]
-  (map->Event {:value      value
+  (make-Event {:value      value
                :initial?   false
                :next?      true
                :end?       false
@@ -23,7 +36,7 @@
                :has-value? true}))
 
 (defn initial [value]
-  (map->Event {:value      value
+  (make-Event {:value      value
                :initial?   true
                :next?      false
                :end?       false
@@ -31,7 +44,7 @@
                :has-value? true}))
 
 (defn end []
-  (map->Event {:value      nil
+  (make-Event {:value      nil
                :initial?   false
                :next?      false
                :end?       true
@@ -39,7 +52,7 @@
                :has-value? false}))
 
 (defn error []
-  (map->Event {:value      nil
+  (make-Event {:value      nil
                :initial?   false
                :next?      false
                :end?       true
@@ -60,11 +73,16 @@
     (subscribe sink)))
 
 (defn push [subscribers event]
+  {:pre [(:event? event)]}
   (let [remove #(vec (concat (subvec %1 0 %2)
                              (subvec %1 (inc %2) (count %1))))]
-    (doseq [[s i] (c/map vector @subscribers (iterate inc 0))]
-      (when (no-more? (s event))
-        (swap! subscribers remove i)))))
+    (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
+            :let [reply (s event)]]
+      (when (or (no-more? reply) (:end? reply))
+        (swap! subscribers remove i))
+      (if (empty? @subscribers)
+        no-more
+        more))))
 
 (defn- make-subscribe [subscribe-prev handler subscribers]
   (fn [sink]
@@ -141,25 +159,48 @@
         (subscribe! left smart-sink)
         (subscribe! right smart-sink)))))
 
+(defn from-poll [delay poll]
+  (eventstream
+    (fn [sink]
+      (let [id (atom nil)
+            unbind #(clear-interval @id)
+            emitter (fn []
+                      (let [value (poll)
+                            reply (sink value)]
+                        (when (or (no-more? reply) (:end? value))
+                          (unbind))))]
+        (reset! id (set-interval delay emitter))
+        unbind))))
+
 (defn later [delay value]
   (eventstream
     (fn [sink]
-      (js/setTimeout
+      (set-timeout
+        delay
         (fn []
           (sink (next value))
-          (sink (end)))
-        delay))))
+          (sink (end)))))))
 
 (defn sequentially [delay values]
+  (let [values (atom values)
+        poll (fn []
+               (let [value (first @values)]
+                 (if value
+                   (do (swap! values rest)
+                       (next value))
+                   (end))))]
+    (from-poll delay poll)))
+
+#_(defn sequentially [delay values]
   (letfn [(schedule
             [sink values]
-            (js/setTimeout
+            (set-timeout
+              delay
               (fn []
                 (if (empty? values)
                   (sink (end))
                   (when-not (no-more? (sink (next (first values))))
-                    (schedule sink (rest values)))))
-              delay))]
+                    (schedule sink (rest values)))))))]
     (eventstream #(schedule % values))))
 
 (defn from-array [values]
