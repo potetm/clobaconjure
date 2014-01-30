@@ -72,37 +72,39 @@
   (subscribe! [property sink]
     (subscribe sink)))
 
-(defn push [subscribers event]
+(defn push [sinks event]
   {:pre [(:event? event)]}
   (let [remove #(vec (concat (subvec %1 0 %2)
                              (subvec %1 (inc %2) (count %1))))]
-    (doseq [[s i] (c/map vector @subscribers (iterate inc 0))
+    (doseq [[s i] (c/map vector @sinks (iterate inc 0))
             :let [reply (s event)]]
       (when (or (no-more? reply) (:end? event))
-        (swap! subscribers remove i))
-      (if (empty? @subscribers)
+        (swap! sinks remove i))
+      (if (empty? @sinks)
         no-more
         more))))
 
-(defn- make-subscribe [subscribe-prev handler subscribers]
+(defn- make-unsubscribe [])
+
+(defn- make-subscribe [subscribe-prev handler sinks]
   (fn [sink]
-    (swap! subscribers conj sink)
-    (when (= (count @subscribers) 1)
+    (swap! sinks conj sink)
+    (when (= (count @sinks) 1)
       (subscribe-prev handler))))
 
 (defn eventstream [subscribe]
-  (let [subscribers (atom [])
-        handler (partial push subscribers)]
-    (->EventStream (make-subscribe subscribe handler subscribers))))
+  (let [sinks (atom [])
+        handler (partial push sinks)]
+    (->EventStream (make-subscribe subscribe handler sinks))))
 
 (defn property [subscribe init-value]
   (let [current-value (atom init-value)
-        subscribers (atom [])
+        sinks (atom [])
         handler (fn [event]
                   (when-not (:end? event)
                     (reset! current-value event))
-                  (push subscribers event))
-        subscribe (make-subscribe subscribe handler subscribers)
+                  (push sinks event))
+        subscribe (make-subscribe subscribe handler sinks)
         my-subscribe (fn [sink]
                        (when @current-value
                          (sink (initial @current-value)))
@@ -121,35 +123,35 @@
         subscribers))))
 
 (defn filter [es f]
-  (let [handler (fn [subscribers event]
+  (let [handler (fn [sinks event]
                   (if (or (:end? event) (f (:value event)))
-                    (push subscribers event)
+                    (push sinks event)
                     more))]
     (from-eventstream es handler)))
 
 (defn map [es f]
-  (let [handler (fn [subscribers event]
-                  (push subscribers
+  (let [handler (fn [sinks event]
+                  (push sinks
                         (if (:end? event)
                           event
                           (next (f (:value event))))))]
     (from-eventstream es handler)))
 
 (defn take-while [es f]
-  (let [handler (fn [subscribers event]
+  (let [handler (fn [sinks event]
                   (if (or (:end? event) (f (:value event)))
-                    (push subscribers event)
+                    (push sinks event)
                     (do
-                      (push subscribers (end))
+                      (push sinks (end))
                       no-more)))]
     (from-eventstream es handler)))
 
 (defn take [es num]
   (let [n (atom num)
-        handler (fn [subscribers event]
+        handler (fn [sinks event]
                   (if (or (:end? event) (>= (swap! n dec) 0))
-                    (push subscribers event)
-                    (do (push subscribers (end))
+                    (push sinks event)
+                    (do (push sinks (end))
                         no-more)))]
     (from-eventstream es handler)))
 
