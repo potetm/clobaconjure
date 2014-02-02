@@ -1,5 +1,5 @@
 (ns clobaconjure.core-test
-  (:require-macros [clobaconjure.macro :refer (defasync expect-events) :as m]
+  (:require-macros [clobaconjure.test-macro :refer (defasync expect-events) :as m]
                    [cemerick.cljs.test :refer (is deftest with-test run-tests testing test-var done)])
   (:require [cemerick.cljs.test :as t]
             [clobaconjure.core :as b]))

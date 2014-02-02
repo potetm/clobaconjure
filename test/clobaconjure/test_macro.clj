@@ -1,4 +1,4 @@
-(ns clobaconjure.macro)
+(ns clobaconjure.test-macro)
 
 (defmacro defasync [name & body]
   `(cemerick.cljs.test/deftest ~(with-meta name (assoc (meta name) :async true))
