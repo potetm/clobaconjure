@@ -9,11 +9,11 @@
      (js/setTimeout #(cemerick.cljs.test/done) ~timeout)
      ~@body))
 
-(defmacro expect-events [src & events-expected]
+(defmacro expect-single-event [src & events-expected]
   `(with-timeout 1000
      (let [events-found# (atom [])]
        (clobaconjure.core/subscribe!
-         ~src
+         (~src)
          (fn [event#]
            (if (:end? event#)
              (do
@@ -23,3 +23,6 @@
                                       "I must have a message")
                (cemerick.cljs.test/done))
              (swap! events-found# conj (:value event#))))))))
+
+(defmacro expect-events [src & events-expected]
+  `(expect-single-event (fn [] ~src) ~@events-expected))
