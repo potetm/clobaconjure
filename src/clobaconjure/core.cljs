@@ -7,6 +7,8 @@
 
 (def no-more? (partial = no-more))
 
+(defn nop [])
+
 (defn- set-interval [delay f]
   (js/setInterval f delay))
 
@@ -84,18 +86,26 @@
         no-more
         more))))
 
-(defn- make-unsubscribe [])
+(defn- make-unsubscribe [unsubscribe-from-source sinks]
+  (let [remove #(vec (remove = %))]
+    (fn [sink]
+      (swap! sinks remove)
+      (when (empty? @sinks)
+        (unsubscribe-from-source)))))
 
-(defn- make-subscribe [subscribe-prev handler sinks]
+(defn- make-subscribe [subscribe-source handler sinks]
   (fn [sink]
     (swap! sinks conj sink)
-    (when (= (count @sinks) 1)
-      (subscribe-prev handler))))
+    (make-unsubscribe
+      (if (= (count @sinks) 1)
+        (subscribe-source handler)
+        nop)
+      sinks)))
 
-(defn eventstream [subscribe]
+(defn eventstream [source]
   (let [sinks (atom [])
         handler (partial push sinks)]
-    (->EventStream (make-subscribe subscribe handler sinks))))
+    (->EventStream (make-subscribe source handler sinks))))
 
 (defn property [subscribe init-value]
   (let [current-value (atom init-value)
