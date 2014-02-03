@@ -1,8 +1,8 @@
 (ns clobaconjure.test.core
-  (:require-macros [clobaconjure.test.macro :refer (defstreamtest defasync expect-stream-events expect-property-events) :as m]
+  (:require-macros [clobaconjure.test.macro :refer (defasync expect-stream-events expect-property-events) :as m]
                    [cemerick.cljs.test :refer (is deftest with-test run-tests testing test-var done)])
-  (:require [cemerick.cljs.test :as t]
-            [clobaconjure.core :as b]))
+  (:require [clobaconjure.core :as b]
+            [clobaconjure.test.macro :as m]))
 
 (defasync later
   (testing "it should send a single event and end"
