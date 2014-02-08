@@ -18,13 +18,21 @@
 (defn- set-timeout [delay f]
   (js/setTimeout f delay))
 
+(defprotocol IMapEvent
+  (map-event [event f]))
+
 (defrecord Event [event?
                   value
                   initial?
                   next?
                   end?
                   error?
-                  has-value?])
+                  has-value?]
+  IMapEvent
+  (map-event [this f]
+    (if has-value?
+      (assoc this :value (f value))
+      this)))
 
 (defn make-Event [map]
   (map->Event (assoc map :event? true)))

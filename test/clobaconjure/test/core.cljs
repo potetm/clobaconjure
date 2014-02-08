@@ -4,6 +4,14 @@
   (:require [clobaconjure.core :as b]
             [clobaconjure.test.macro :as m]))
 
+(deftest map-event
+  (testing "events should be mappable"
+    (is (= (b/initial "b") (b/map-event (b/initial "a") (constantly "b"))))))
+
+(deftest map-event
+  (testing "even events that have no value"
+    (is (= (b/end) (b/map-event (b/end) (constantly "b"))))))
+
 (defasync on-value!
   (testing "it should receive values"
     (let [values (atom [])]
