@@ -121,7 +121,6 @@
 (defn to-property [es init-value]
   (property (:subscribe es) init-value))
 
-
 (defn from-poll [delay poll]
   (eventstream
     (fn [sink]
@@ -166,6 +165,12 @@
       (doseq [v values]
         (sink (next v)))
       (sink (end)))))
+
+(defn constant [value]
+  (property
+    (fn [sink]
+      (sink (end)))
+    value))
 
 (defn merge [left right]
   (eventstream

@@ -10,8 +10,8 @@
       (-> (b/sequentially 10 ["looza!" "foo!"])
           (b/on-value! #(swap! values conj %)))
       (later 30
-        (is (= @values ["looza!" "foo!"]))
-        (done)))))
+             (is (= @values ["looza!" "foo!"]))
+             (done)))))
 
 (defasync unsubscribe
   (testing "it should unsubscribe"
@@ -24,8 +24,8 @@
                       (swap! values conj v)
                       (@unsub)))))
       (later 30
-        (is (= @values [1]))
-        (done)))))
+             (is (= @values [1]))
+             (done)))))
 
 (defasync later
   (testing "it should send a single event and end"
@@ -109,3 +109,16 @@
       (-> (b/repeatedly 10 [1 2 3])
           (b/take 6))
       1 2 3 1 2 3)))
+
+(defasync constant
+  (testing "that it's constant"
+    (expect-property-events
+      (b/constant "wat")
+      "wat")))
+
+#_(defasync constant
+  (testing "that it's *always* constant"
+    (expect-property-events
+      (-> (b/sequentially 10 [1 2 3])
+          (b/map (b/constant "wat")))
+      "wat" "wat" "wat")))
