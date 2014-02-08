@@ -121,20 +121,6 @@
 (defn to-property [es init-value]
   (property (:subscribe es) init-value))
 
-(defn merge [left right]
-  (eventstream
-    (fn [sink]
-      (let [end-me? (atom false)
-            smart-sink (fn [event]
-                         (if (:end? event)
-                           (if @end-me?
-                             (sink (end))
-                             (do
-                               (reset! end-me? true)
-                               more))
-                           (sink event)))]
-        (subscribe! left smart-sink)
-        (subscribe! right smart-sink)))))
 
 (defn from-poll [delay poll]
   (eventstream
@@ -180,6 +166,21 @@
       (doseq [v values]
         (sink (next v)))
       (sink (end)))))
+
+(defn merge [left right]
+  (eventstream
+    (fn [sink]
+      (let [end-me? (atom false)
+            smart-sink (fn [event]
+                         (if (:end? event)
+                           (if @end-me?
+                             (sink (end))
+                             (do
+                               (reset! end-me? true)
+                               more))
+                           (sink event)))]
+        (subscribe! left smart-sink)
+        (subscribe! right smart-sink)))))
 
 (defn- from-eventstream [es handler]
   (let [subscribers (atom [])]
