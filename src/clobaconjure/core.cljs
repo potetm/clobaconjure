@@ -220,10 +220,7 @@
 
 (defn map [es f]
   (let [handler (fn [sinks event]
-                  (push sinks
-                        (if (:end? event)
-                          event
-                          (next (f (:value event))))))]
+                  (push sinks (map-event event f)))]
     (from-eventstream es handler)))
 
 (defn take-while [es f]
