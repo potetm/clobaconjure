@@ -121,55 +121,6 @@
 (defn to-property [es init-value]
   (property (:subscribe es) init-value))
 
-(defn- from-eventstream [es handler]
-  (let [subscribers (atom [])]
-    (->EventStream
-      (make-subscribe
-        (:subscribe es)
-        (partial handler subscribers)
-        subscribers)
-      subscribers)))
-
-(defn on-value! [es f]
-  (subscribe!
-    es
-    (fn [event]
-      (when (:has-value? event)
-        (f (:value event))))))
-
-(defn filter [es f]
-  (let [handler (fn [sinks event]
-                  (if (or (:end? event) (f (:value event)))
-                    (push sinks event)
-                    more))]
-    (from-eventstream es handler)))
-
-(defn map [es f]
-  (let [handler (fn [sinks event]
-                  (push sinks
-                        (if (:end? event)
-                          event
-                          (next (f (:value event))))))]
-    (from-eventstream es handler)))
-
-(defn take-while [es f]
-  (let [handler (fn [sinks event]
-                  (if (or (:end? event) (f (:value event)))
-                    (push sinks event)
-                    (do
-                      (push sinks (end))
-                      no-more)))]
-    (from-eventstream es handler)))
-
-(defn take [es num]
-  (let [n (atom num)
-        handler (fn [sinks event]
-                  (if (or (:end? event) (>= (swap! n dec) 0))
-                    (push sinks event)
-                    (do (push sinks (end))
-                        no-more)))]
-    (from-eventstream es handler)))
-
 (defn merge [left right]
   (eventstream
     (fn [sink]
@@ -229,3 +180,52 @@
       (doseq [v values]
         (sink (next v)))
       (sink (end)))))
+
+(defn- from-eventstream [es handler]
+  (let [subscribers (atom [])]
+    (->EventStream
+      (make-subscribe
+        (:subscribe es)
+        (partial handler subscribers)
+        subscribers)
+      subscribers)))
+
+(defn on-value! [es f]
+  (subscribe!
+    es
+    (fn [event]
+      (when (:has-value? event)
+        (f (:value event))))))
+
+(defn filter [es f]
+  (let [handler (fn [sinks event]
+                  (if (or (:end? event) (f (:value event)))
+                    (push sinks event)
+                    more))]
+    (from-eventstream es handler)))
+
+(defn map [es f]
+  (let [handler (fn [sinks event]
+                  (push sinks
+                        (if (:end? event)
+                          event
+                          (next (f (:value event))))))]
+    (from-eventstream es handler)))
+
+(defn take-while [es f]
+  (let [handler (fn [sinks event]
+                  (if (or (:end? event) (f (:value event)))
+                    (push sinks event)
+                    (do
+                      (push sinks (end))
+                      no-more)))]
+    (from-eventstream es handler)))
+
+(defn take [es num]
+  (let [n (atom num)
+        handler (fn [sinks event]
+                  (if (or (:end? event) (>= (swap! n dec) 0))
+                    (push sinks event)
+                    (do (push sinks (end))
+                        no-more)))]
+    (from-eventstream es handler)))
