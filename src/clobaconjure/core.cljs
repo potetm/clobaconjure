@@ -61,18 +61,15 @@
                :error?     true
                :has-value? false}))
 
-(defprotocol ISubscribable
-  (subscribe! [eventstream sink]))
+(defrecord EventStream [subscribe subscribers])
 
-(defrecord EventStream [subscribe]
-  ISubscribable
-  (subscribe! [eventstream sink]
-    (subscribe sink)))
+(defrecord Property [subscribe subscribers])
 
-(defrecord Property [subscribe]
-  ISubscribable
-  (subscribe! [property sink]
-    (subscribe sink)))
+(defn subscribe! [obs subscriber]
+  ((:subscribe obs) subscriber))
+
+(defn subscribers [obs]
+  @(:subscribers obs))
 
 (defn push [sinks event]
   {:pre [(:event? event)]}
@@ -103,23 +100,23 @@
       sinks)))
 
 (defn eventstream [source]
-  (let [sinks (atom [])
-        handler (partial push sinks)]
-    (->EventStream (make-subscribe source handler sinks))))
+  (let [subscribers (atom [])
+        handler (partial push subscribers)]
+    (->EventStream (make-subscribe source handler subscribers) subscribers)))
 
 (defn property [subscribe init-value]
   (let [current-value (atom init-value)
-        sinks (atom [])
+        subscribers (atom [])
         handler (fn [event]
                   (when-not (:end? event)
                     (reset! current-value event))
-                  (push sinks event))
-        subscribe (make-subscribe subscribe handler sinks)
+                  (push subscribers event))
+        subscribe (make-subscribe subscribe handler subscribers)
         my-subscribe (fn [sink]
                        (when @current-value
                          (sink (initial @current-value)))
                        (subscribe sink))]
-    (->Property my-subscribe)))
+    (->Property my-subscribe subscribers)))
 
 (defn to-property [es init-value]
   (property (:subscribe es) init-value))
@@ -130,7 +127,8 @@
       (make-subscribe
         (:subscribe es)
         (partial handler subscribers)
-        subscribers))))
+        subscribers)
+      subscribers)))
 
 (defn filter [es f]
   (let [handler (fn [sinks event]

@@ -26,7 +26,9 @@
   (testing "it should not think an empty object is end"
     (let [empty #js {}
           not-empty #js {:not "empty"}]
-      (expect-stream-events (b/from-array [empty not-empty]) empty not-empty))))
+      (expect-stream-events
+        (b/from-array [empty not-empty])
+        empty not-empty))))
 
 (defasync filtering
   (testing "it should filter values"
