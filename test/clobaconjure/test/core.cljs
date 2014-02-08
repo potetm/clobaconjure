@@ -1,8 +1,31 @@
 (ns clobaconjure.test.core
-  (:require-macros [clobaconjure.test.macro :refer (defasync expect-stream-events expect-property-events) :as m]
+  (:require-macros [clobaconjure.test.macro :refer (defasync expect-stream-events expect-property-events later) :as m]
                    [cemerick.cljs.test :refer (is deftest with-test run-tests testing test-var done)])
   (:require [clobaconjure.core :as b]
             [clobaconjure.test.macro :as m]))
+
+(defasync on-value!
+  (testing "it should receive values"
+    (let [values (atom [])]
+      (-> (b/sequentially 10 ["looza!" "foo!"])
+          (b/on-value! #(swap! values conj %)))
+      (later 30
+        (is (= @values ["looza!" "foo!"]))
+        (done)))))
+
+(defasync unsubscribe
+  (testing "it should unsubscribe"
+    (let [values (atom [])
+          unsub (atom nil)]
+      (reset! unsub
+              (-> (b/sequentially 10 [1 2])
+                  (b/on-value!
+                    (fn [v]
+                      (swap! values conj v)
+                      (@unsub)))))
+      (later 30
+        (is (= @values [1]))
+        (done)))))
 
 (defasync later
   (testing "it should send a single event and end"

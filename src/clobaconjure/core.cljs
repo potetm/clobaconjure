@@ -130,6 +130,13 @@
         subscribers)
       subscribers)))
 
+(defn on-value! [es f]
+  (subscribe!
+    es
+    (fn [event]
+      (when (:has-value? event)
+        (f (:value event))))))
+
 (defn filter [es f]
   (let [handler (fn [sinks event]
                   (if (or (:end? event) (f (:value event)))
