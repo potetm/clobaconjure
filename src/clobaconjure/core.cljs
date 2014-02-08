@@ -211,9 +211,9 @@
       (when (:has-value? event)
         (f (:value event))))))
 
-(defn filter [es f]
+(defn filter [es pred]
   (let [handler (fn [sinks event]
-                  (if (or (:end? event) (f (:value event)))
+                  (if (or (:end? event) (pred (:value event)))
                     (push sinks event)
                     more))]
     (from-eventstream es handler)))
@@ -223,9 +223,9 @@
                   (push sinks (map-event event f)))]
     (from-eventstream es handler)))
 
-(defn take-while [es f]
+(defn take-while [es pred]
   (let [handler (fn [sinks event]
-                  (if (or (:end? event) (f (:value event)))
+                  (if (or (:end? event) (pred (:value event)))
                     (push sinks event)
                     (do
                       (push sinks (end))
@@ -239,4 +239,13 @@
                     (push sinks event)
                     (do (push sinks (end))
                         no-more)))]
+    (from-eventstream es handler)))
+
+(defn take-until [es pred]
+  (letfn [(handler
+            [sinks event]
+            (if (and (:has-value? event) (pred (:value event)))
+              (do (push sinks (end))
+                  no-more)
+              (push sinks event)))]
     (from-eventstream es handler)))

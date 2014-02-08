@@ -111,6 +111,13 @@
           (b/take 3))
       1 2 3)))
 
+(defasync taking-until
+  (testing "it takes until pred returns true"
+    (expect-stream-events
+      (-> (b/from-array [1 2 3])
+          (b/take-until even?))
+      1)))
+
 (defasync repeating
   (testing "it repeats"
     (expect-stream-events
@@ -123,10 +130,3 @@
     (expect-property-events
       (b/constant "wat")
       "wat")))
-
-#_(defasync constant
-  (testing "that it's *always* constant"
-    (expect-property-events
-      (-> (b/sequentially 10 [1 2 3])
-          (b/map (b/constant "wat")))
-      "wat" "wat" "wat")))
