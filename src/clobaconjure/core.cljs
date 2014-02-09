@@ -53,10 +53,12 @@
 (defn- make-subscribe [source handler sinks]
   (let [ended? (atom false)
         handler (fn [event]
-                  (when (:end? event)
-                    (reset! ended? true))
-                  (when (or (not @ended?) (:end? event))
-                    (handler event)))]
+                  (let [my-end? @ended?]
+                    (when (:end? event)
+                      (reset! ended? true))
+                    (if my-end?
+                      (handler (e/end))
+                      (handler event))))]
     (fn [sink]
       (swap! sinks conj sink)
       (make-unsubscribe

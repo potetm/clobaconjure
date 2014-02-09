@@ -33,6 +33,12 @@
         (is (= @values [1]))
         (done)))))
 
+(defasync ended-stream
+  (testing "it should only send an end after it's ended"
+    (let [stream (b/from-array [1 2 3])]
+      (b/subscribe! stream b/nop)
+      (expect-stream-events stream))))
+
 (defasync later
   (testing "it should send a single event and end"
     (expect-stream-events

@@ -20,7 +20,7 @@
           src
           (fn [event]
             (if (:end? event)
-              (verify-results -test-ctx done? src @events-found events-expected)
+              (verify-results -test-ctx done? src @events-found (or events-expected []))
               (swap! events-found conj (:value event)))))
         ;; TODO: Make this check done? and re-poll if necessary
         (later 70
@@ -42,5 +42,5 @@
           (b/subscribe!
             src
             (new-sink))
-          (later 50
+          (later 70
             (verify-cleanup -test-ctx src)))))))
