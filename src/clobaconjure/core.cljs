@@ -1,6 +1,7 @@
 (ns clobaconjure.core
-  (:refer-clojure :exclude [filter map merge next repeatedly take take-while])
-  (:require [cljs.core :as c]))
+  (:refer-clojure :exclude [filter map merge repeatedly take take-while])
+  (:require [cljs.core :as c]
+            [clobaconjure.event :as e]))
 
 (def no-more #js ["<no-more>"])
 (def more #js ["<more>"])
@@ -17,57 +18,6 @@
 
 (defn- set-timeout [delay f]
   (js/setTimeout f delay))
-
-(defprotocol IMapEvent
-  (map-event [event f]))
-
-(defrecord Event [event?
-                  value
-                  initial?
-                  next?
-                  end?
-                  error?
-                  has-value?]
-  IMapEvent
-  (map-event [this f]
-    (if has-value?
-      (assoc this :value (f value))
-      this)))
-
-(defn make-Event [map]
-  (map->Event (assoc map :event? true)))
-
-(defn next [value]
-  (make-Event {:value      value
-               :initial?   false
-               :next?      true
-               :end?       false
-               :error?     false
-               :has-value? true}))
-
-(defn initial [value]
-  (make-Event {:value      value
-               :initial?   true
-               :next?      false
-               :end?       false
-               :error?     false
-               :has-value? true}))
-
-(defn end []
-  (make-Event {:value      nil
-               :initial?   false
-               :next?      false
-               :end?       true
-               :error?     false
-               :has-value? false}))
-
-(defn error []
-  (make-Event {:value      nil
-               :initial?   false
-               :next?      false
-               :end?       true
-               :error?     true
-               :has-value? false}))
 
 (defrecord EventStream [subscribe subscribers])
 
@@ -122,7 +72,7 @@
         subscribe (make-subscribe subscribe handler subscribers)
         my-subscribe (fn [sink]
                        (when @current-value
-                         (sink (initial @current-value)))
+                         (sink (e/initial @current-value)))
                        (subscribe sink))]
     (->Property my-subscribe subscribers)))
 
@@ -148,8 +98,8 @@
                (let [value (first @values)]
                  (if value
                    (do (swap! values rest)
-                       (next value))
-                   (end))))]
+                       (e/next value))
+                   (e/end))))]
     (from-poll delay poll)))
 
 (defn later [delay value]
@@ -161,23 +111,23 @@
         poll (fn []
                (->> (mod (swap! index inc) length)
                     (get values)
-                    next))]
+                    e/next))]
     (from-poll delay poll)))
 
 (defn interval [delay value]
-  (from-poll delay #(next value)))
+  (from-poll delay #(e/next value)))
 
 (defn from-array [values]
   (eventstream
     (fn [sink]
       (doseq [v values]
-        (sink (next v)))
-      (sink (end)))))
+        (sink (e/next v)))
+      (sink (e/end)))))
 
 (defn constant [value]
   (property
     (fn [sink]
-      (sink (end)))
+      (sink (e/end)))
     value))
 
 (defn merge [left right]
@@ -187,7 +137,7 @@
             smart-sink (fn [event]
                          (if (:end? event)
                            (if @end-me?
-                             (sink (end))
+                             (sink (e/end))
                              (do
                                (reset! end-me? true)
                                more))
@@ -220,7 +170,7 @@
 
 (defn map [es f]
   (let [handler (fn [sinks event]
-                  (push sinks (map-event event f)))]
+                  (push sinks (e/map-event event f)))]
     (from-eventstream es handler)))
 
 (defn take-while [es pred]
@@ -228,7 +178,7 @@
                   (if (or (:end? event) (pred (:value event)))
                     (push sinks event)
                     (do
-                      (push sinks (end))
+                      (push sinks (e/end))
                       no-more)))]
     (from-eventstream es handler)))
 
@@ -237,15 +187,6 @@
         handler (fn [sinks event]
                   (if (or (:end? event) (>= (swap! n dec) 0))
                     (push sinks event)
-                    (do (push sinks (end))
+                    (do (push sinks (e/end))
                         no-more)))]
-    (from-eventstream es handler)))
-
-(defn take-until [es pred]
-  (letfn [(handler
-            [sinks event]
-            (if (and (:has-value? event) (pred (:value event)))
-              (do (push sinks (end))
-                  no-more)
-              (push sinks event)))]
     (from-eventstream es handler)))

@@ -4,14 +4,6 @@
   (:require [clobaconjure.core :as b]
             [clobaconjure.test.macro :as m]))
 
-(deftest map-event
-  (testing "events should be mappable"
-    (is (= (b/initial "b") (b/map-event (b/initial "a") (constantly "b"))))))
-
-(deftest map-event
-  (testing "even events that have no value"
-    (is (= (b/end) (b/map-event (b/end) (constantly "b"))))))
-
 (defasync on-value!
   (testing "it should receive values"
     (let [values (atom [])]
@@ -110,13 +102,6 @@
       (-> (b/from-array [1 2 3 4 5])
           (b/take 3))
       1 2 3)))
-
-(defasync taking-until
-  (testing "it takes until pred returns true"
-    (expect-stream-events
-      (-> (b/from-array [1 2 3])
-          (b/take-until even?))
-      1)))
 
 (defasync repeating
   (testing "it repeats"
