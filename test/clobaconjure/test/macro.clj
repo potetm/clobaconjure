@@ -11,7 +11,7 @@
      (js/setTimeout
        (fn []
          (when (not (deref ~done?))
-           (cemerick.cljs.test/is false)
+           (cemerick.cljs.test/is false "TIMED OUT!")
            (cemerick.cljs.test/done)))
        ~timeout)
      ~@body))

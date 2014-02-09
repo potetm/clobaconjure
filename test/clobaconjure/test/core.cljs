@@ -4,6 +4,8 @@
   (:require [clobaconjure.core :as b]
             [clobaconjure.test.macro :as m]))
 
+(enable-console-print!)
+
 ;; TODO: All of these tests are pretty weak because they depend heavily on timing.
 ;; It would be much better to us a function/macro that polls to see if the stream
 ;; is done rather than have to tweak wait times.
@@ -14,8 +16,8 @@
       (-> (b/sequentially 1 ["looza!" "foo!"])
           (b/on-value! #(swap! values conj %)))
       (later 25
-             (is (= @values ["looza!" "foo!"]))
-             (done)))))
+        (is (= @values ["looza!" "foo!"]))
+        (done)))))
 
 (defasync unsubscribe
   (testing "it should unsubscribe"
@@ -28,8 +30,8 @@
                       (swap! values conj v)
                       (@unsub)))))
       (later 3
-             (is (= @values [1]))
-             (done)))))
+        (is (= @values [1]))
+        (done)))))
 
 (defasync later
   (testing "it should send a single event and end"
@@ -97,8 +99,16 @@
   (testing "delivers current value and changes"
     (expect-property-events
       (-> (b/later 5 "b")
-          (b/to-property "a"))
+          (b/merge (b/from-array ["a"]))
+          (b/to-property))
       "a" "b")))
+
+(defasync property-current-value
+  (testing "New subscribers to ended stream receive current value and end event"
+    (let [prop (-> (b/from-array ["a" "b"])
+                   (b/to-property))]
+      (b/subscribe! prop b/nop)
+      (expect-property-events prop "b"))))
 
 (defasync taking-n
   (testing "it takes the first n values"

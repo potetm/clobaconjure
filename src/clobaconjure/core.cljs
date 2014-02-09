@@ -3,6 +3,8 @@
   (:require [cljs.core :as c]
             [clobaconjure.event :as e]))
 
+(enable-console-print!)
+
 (def no-more #js ["<no-more>"])
 (def more #js ["<more>"])
 
@@ -48,36 +50,42 @@
       (when (empty? @sinks)
         (unsubscribe-from-source)))))
 
-(defn- make-subscribe [subscribe-source handler sinks]
-  (fn [sink]
-    (swap! sinks conj sink)
-    (make-unsubscribe
-      (if (= (count @sinks) 1)
-        (subscribe-source handler)
-        nop)
-      sinks)))
+(defn- make-subscribe [source handler sinks]
+  (let [ended? (atom false)
+        handler (fn [event]
+                  (when (:end? event)
+                    (reset! ended? true))
+                  (when (or (not @ended?) (:end? event))
+                    (handler event)))]
+    (fn [sink]
+      (swap! sinks conj sink)
+      (make-unsubscribe
+        (if (= (count @sinks) 1)
+          (source handler)
+          nop)
+        sinks))))
 
 (defn eventstream [source]
   (let [subscribers (atom [])
         handler (partial push subscribers)]
     (->EventStream (make-subscribe source handler subscribers) subscribers)))
 
-(defn property [subscribe init-value]
-  (let [current-value (atom init-value)
+(defn property [source]
+  (let [current-value (atom ::none)
         subscribers (atom [])
         handler (fn [event]
                   (when-not (:end? event)
-                    (reset! current-value event))
+                    (reset! current-value (:value event)))
                   (push subscribers event))
-        subscribe (make-subscribe subscribe handler subscribers)
+        subscribe (make-subscribe source handler subscribers)
         my-subscribe (fn [sink]
-                       (when @current-value
+                       (when-not (= ::none @current-value)
                          (sink (e/initial @current-value)))
                        (subscribe sink))]
     (->Property my-subscribe subscribers)))
 
-(defn to-property [es init-value]
-  (property (:subscribe es) init-value))
+(defn to-property [es]
+  (property (:subscribe es)))
 
 (defn from-poll [delay poll]
   (eventstream
@@ -126,8 +134,8 @@
 (defn constant [value]
   (property
     (fn [sink]
-      (sink (e/end)))
-    value))
+      (sink (e/initial value))
+      (sink (e/end)))))
 
 (defn merge [left right]
   (eventstream
