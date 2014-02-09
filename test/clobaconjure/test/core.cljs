@@ -4,12 +4,16 @@
   (:require [clobaconjure.core :as b]
             [clobaconjure.test.macro :as m]))
 
+;; TODO: All of these tests are pretty weak because they depend heavily on timing.
+;; It would be much better to us a function/macro that polls to see if the stream
+;; is done rather than have to tweak wait times.
+
 (defasync on-value!
   (testing "it should receive values"
     (let [values (atom [])]
-      (-> (b/sequentially 10 ["looza!" "foo!"])
+      (-> (b/sequentially 1 ["looza!" "foo!"])
           (b/on-value! #(swap! values conj %)))
-      (later 30
+      (later 25
              (is (= @values ["looza!" "foo!"]))
              (done)))))
 
@@ -18,25 +22,25 @@
     (let [values (atom [])
           unsub (atom nil)]
       (reset! unsub
-              (-> (b/sequentially 10 [1 2])
+              (-> (b/sequentially 1 [1 2])
                   (b/on-value!
                     (fn [v]
                       (swap! values conj v)
                       (@unsub)))))
-      (later 30
+      (later 3
              (is (= @values [1]))
              (done)))))
 
 (defasync later
   (testing "it should send a single event and end"
     (expect-stream-events
-      (b/later 10 "hipsta!")
+      (b/later 1 "hipsta!")
       "hipsta!")))
 
 (defasync sequentially
   (testing "it should send events and end"
     (expect-stream-events
-      (b/sequentially 10 ["hipsta 1" "hipsta 2"])
+      (b/sequentially 1 ["hipsta 1" "hipsta 2"])
       "hipsta 1" "hipsta 2")))
 
 (defasync empty-map
@@ -92,7 +96,7 @@
 (defasync property
   (testing "delivers current value and changes"
     (expect-property-events
-      (-> (b/later 50 "b")
+      (-> (b/later 5 "b")
           (b/to-property "a"))
       "a" "b")))
 
@@ -106,9 +110,9 @@
 (defasync repeating
   (testing "it repeats"
     (expect-stream-events
-      (-> (b/repeatedly 10 [1 2 3])
-          (b/take 6))
-      1 2 3 1 2 3)))
+      (-> (b/repeatedly 1 [1 2 3])
+          (b/take 5))
+      1 2 3 1 2)))
 
 (defasync constant
   (testing "that it's constant"

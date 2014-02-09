@@ -12,10 +12,10 @@
                   error?
                   has-value?]
   IMapEvent
-  (map-event [this f]
-    (if has-value?
-      (assoc this :value (f value))
-      this)))
+  (map-event [event f]
+    (if (:has-value? event)
+      (assoc event :value (f (:value event)) )
+      event)))
 
 (defn make-Event [map]
   (map->Event (assoc map :event? true)))

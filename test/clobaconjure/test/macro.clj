@@ -26,8 +26,7 @@
 ;; TODO: figure out how to get rid of the multiple done calls here
 (defmacro expect-stream-events [src & events-expected]
   `(do
-     (verify-single-subscriber ~'-test-ctx ~src ~@events-expected)
-     (verify-switching ~'-test-ctx ~src ~@events-expected)))
+     (verify-single-subscriber ~'-test-ctx ~src ~@events-expected)))
 
 (defmacro expect-property-events [src & events-expected]
   `(do

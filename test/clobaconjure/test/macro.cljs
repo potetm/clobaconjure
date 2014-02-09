@@ -14,7 +14,7 @@
 
 (defn verify-single-subscriber [-test-ctx src & events-expected]
   (let [done? (atom false)]
-    (with-timeout 1000 done?
+    (with-timeout 100 done?
       (let [events-found (atom [])]
         (b/subscribe!
           src
@@ -22,12 +22,14 @@
             (if (:end? event)
               (verify-results -test-ctx done? src @events-found events-expected)
               (swap! events-found conj (:value event)))))
-        (later 200
+        ;; TODO: Make this check done? and re-poll if necessary
+        (later 70
           (verify-cleanup -test-ctx src))))))
 
-(defn verify-switching [-test-ctx src & events-expected]
+;; TODO: Reintegrate this. It's a good test, but I don't want it run as part of other tests
+#_(defn verify-switching [-test-ctx src & events-expected]
   (let [done? (atom false)]
-    (with-timeout 1000 done?
+    (with-timeout 100 done?
       (let [events-found (atom [])]
         (letfn [(new-sink
                   []
@@ -40,5 +42,5 @@
           (b/subscribe!
             src
             (new-sink))
-          (later 200
+          (later 50
             (verify-cleanup -test-ctx src)))))))

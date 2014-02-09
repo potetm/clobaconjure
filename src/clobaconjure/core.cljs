@@ -106,12 +106,11 @@
   (sequentially delay [value]))
 
 (defn repeatedly [delay values]
-  (let [index (atom -1)
-        length (count values)
+  (let [values (atom values)
         poll (fn []
-               (->> (mod (swap! index inc) length)
-                    (get values)
-                    e/next))]
+               (let [val (first @values)]
+                 (swap! values #(conj (vec (rest %)) val))
+                 (e/next val)))]
     (from-poll delay poll)))
 
 (defn interval [delay value]
