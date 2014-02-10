@@ -22,9 +22,54 @@
 (defn- set-timeout [delay f]
   (js/setTimeout f delay))
 
-(declare ^:private combine-properties)
+(declare subscribe!
+         property)
 
 (defrecord EventStream [subscribe subscribers])
+
+(defn- combine-end [sink-out unsubscribe! sink-mine end-mine? end-theirs?]
+  (reset! end-mine? true)
+  (when (and @end-mine? @end-theirs?)
+    (sink-mine sink-out (e/end))
+    (unsubscribe!))
+  no-more)
+
+(defn- push-combine-event [sink-out event unsubscribe! val-mine val-theirs sink-mine initial-sent?]
+  (reset! val-mine (:value event))
+  (cond
+    (or (= @val-mine ::none) (= @val-theirs ::none)) more
+    (and @initial-sent? (:initial? event)) more
+    :default
+    (do (reset! initial-sent? true)
+        (let [reply (sink-mine sink-out event)]
+          (when (no-more? reply)
+            (unsubscribe!))
+          reply))))
+
+(defn- combine-sinks [sink-out unsubscribe! val-mine val-theirs end-mine? end-theirs? sink-mine]
+  (fn [event]
+    (let [initial-sent? (atom false)]
+      (cond
+        (:end? event) (combine-end sink-out unsubscribe! sink-mine end-mine? end-theirs?)
+        :default (push-combine-event sink-out event unsubscribe! val-mine val-theirs sink-mine initial-sent?)))))
+
+(defn- combine-properties [stream-left sink-left stream-right sink-right]
+  (let [val-left (atom ::none)
+        val-right (atom ::none)
+        end-left? (atom false)
+        end-right? (atom false)
+        unsub-left (atom nop)
+        unsub-right (atom nop)
+        unsub (fn [] (@unsub-left) (@unsub-right))
+        sink-left #(sink-left @val-left @val-right %1 %2)
+        sink-right #(sink-right @val-left @val-right %1 %2)]
+    (property
+      (fn [sink-out]
+        (let [sink-left (combine-sinks sink-out unsub val-left val-right end-left? end-right? sink-left)
+              sink-right (combine-sinks sink-out unsub val-right val-left end-right? end-left? sink-right)]
+          (reset! unsub-left (subscribe! stream-left sink-left))
+          (reset! unsub-right (subscribe! stream-right sink-right))
+          unsub)))))
 
 (defprotocol IProperty
   (combine [left right f]))
@@ -118,43 +163,6 @@
         (reset! id (set-interval delay emitter))
         unbind))))
 
-(defn- combine-sinks [out-sink my-val my-end? my-sink their-val their-end? unsubscribe!]
-  (let [initial-sent (atom false)]
-    (fn [event]
-      (cond
-        (:end? event) (do (reset! my-end? true)
-                          (when (and @my-end? @their-end?)
-                            (my-sink out-sink (e/end))
-                            (unsubscribe!))
-                          no-more)
-        :default (do (reset! my-val (:value event))
-                     (if (or (= @my-val ::none) (= @their-val ::none))
-                       more
-                       (if (and @initial-sent (:initial? event))
-                         more
-                         (do (reset! initial-sent true)
-                             (let [reply (my-sink out-sink event)]
-                               (when (no-more? reply)
-                                 (unsubscribe!))
-                               reply)))))))))
-
-(defn- combine-properties [left sink-left right sink-right]
-  (let [val-left (atom ::none)
-        val-right (atom ::none)
-        end-left? (atom false)
-        end-right? (atom false)
-        unsub-left (atom nop)
-        unsub-right (atom nop)
-        sink-left #(sink-left @val-left @val-right %1 %2)
-        sink-right #(sink-right @val-left @val-right %1 %2)]
-    (property
-      (fn [sink]
-        (let [unsub (fn [] (@unsub-left) (@unsub-right))
-              sink-left (combine-sinks sink val-left end-left? sink-left val-right end-right? unsub)
-              sink-right (combine-sinks sink val-right end-right? sink-right val-left end-left? unsub)]
-          (reset! unsub-left (subscribe! left sink-left))
-          (reset! unsub-right (subscribe! right sink-right))
-          unsub)))))
 
 (defn sequentially [delay values]
   (let [values (atom values)
