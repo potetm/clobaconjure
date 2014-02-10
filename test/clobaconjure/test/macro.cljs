@@ -4,6 +4,8 @@
   (:require [cemerick.cljs.test :as t]
             [clobaconjure.core :as b]))
 
+(enable-console-print!)
+
 (defn verify-cleanup [-test-ctx src]
   (is -test-ctx (= (count (b/subscribers src)) 0) "Cleaning up")
   (done))

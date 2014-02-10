@@ -9,6 +9,7 @@
 (def more #js ["<more>"])
 
 (def no-more? (partial = no-more))
+(def more? (partial = more))
 
 (defn nop [])
 
@@ -21,9 +22,20 @@
 (defn- set-timeout [delay f]
   (js/setTimeout f delay))
 
+(declare ^:private combine-properties)
+
 (defrecord EventStream [subscribe subscribers])
 
-(defrecord Property [subscribe subscribers])
+(defprotocol IProperty
+  (combine [left right f]))
+
+(defrecord Property [subscribe subscribers]
+  IProperty
+  (combine [left right f]
+    (let [combine-and-push
+          (fn [val-left val-right sink event]
+            (sink (e/apply-event event (f val-left val-right))))]
+      (combine-properties left combine-and-push right combine-and-push))))
 
 (defn subscribe! [obs subscriber]
   ((:subscribe obs) subscriber))
@@ -31,22 +43,25 @@
 (defn subscribers [obs]
   @(:subscribers obs))
 
-(defn push [sinks event]
+(defn- push [sinks event]
   {:pre [(:event? event)]}
-  (let [remove #(vec (concat (subvec %1 0 %2)
-                             (subvec %1 (inc %2) (count %1))))]
-    (doseq [[s i] (c/map vector @sinks (iterate inc 0))
+  (let [to-remove (atom [])]
+    (doseq [s @sinks
             :let [reply (s event)]]
-      (when (or (no-more? reply) (:end? event))
-        (swap! sinks remove i))
-      (if (empty? @sinks)
-        no-more
-        more))))
+      (when (or (no-more? reply))
+        (swap! to-remove conj s)))
+    (if (:end? event)
+      (reset! sinks [])
+      (doseq [s @to-remove]
+        (swap! sinks #(vec (remove #{%2} %1)) s)))
+    (if (seq @sinks)
+      more
+      no-more)))
 
-(defn- make-unsubscribe [unsubscribe-from-source sinks]
-  (let [remove #(vec (remove = %))]
-    (fn [sink]
-      (swap! sinks remove)
+(defn- make-unsubscribe [unsubscribe-from-source sink sinks]
+  (let [remove #(vec (remove #{%2} %1))]
+    (fn []
+      (swap! sinks remove sink)
       (when (empty? @sinks)
         (unsubscribe-from-source)))))
 
@@ -65,6 +80,7 @@
         (if (= (count @sinks) 1)
           (source handler)
           nop)
+        sink
         sinks))))
 
 (defn eventstream [source]
@@ -102,6 +118,44 @@
         (reset! id (set-interval delay emitter))
         unbind))))
 
+(defn- combine-sinks [out-sink my-val my-end? my-sink their-val their-end? unsubscribe!]
+  (let [initial-sent (atom false)]
+    (fn [event]
+      (cond
+        (:end? event) (do (reset! my-end? true)
+                          (when (and @my-end? @their-end?)
+                            (my-sink out-sink (e/end))
+                            (unsubscribe!))
+                          no-more)
+        :default (do (reset! my-val (:value event))
+                     (if (or (= @my-val ::none) (= @their-val ::none))
+                       more
+                       (if (and @initial-sent (:initial? event))
+                         more
+                         (do (reset! initial-sent true)
+                             (let [reply (my-sink out-sink event)]
+                               (when (no-more? reply)
+                                 (unsubscribe!))
+                               reply)))))))))
+
+(defn- combine-properties [left sink-left right sink-right]
+  (let [val-left (atom ::none)
+        val-right (atom ::none)
+        end-left? (atom false)
+        end-right? (atom false)
+        unsub-left (atom nop)
+        unsub-right (atom nop)
+        sink-left #(sink-left @val-left @val-right %1 %2)
+        sink-right #(sink-right @val-left @val-right %1 %2)]
+    (property
+      (fn [sink]
+        (let [unsub (fn [] (@unsub-left) (@unsub-right))
+              sink-left (combine-sinks sink val-left end-left? sink-left val-right end-right? unsub)
+              sink-right (combine-sinks sink val-right end-right? sink-right val-left end-left? unsub)]
+          (reset! unsub-left (subscribe! left sink-left))
+          (reset! unsub-right (subscribe! right sink-right))
+          unsub)))))
+
 (defn sequentially [delay values]
   (let [values (atom values)
         poll (fn []
@@ -131,7 +185,8 @@
     (fn [sink]
       (doseq [v values]
         (sink (e/next v)))
-      (sink (e/end)))))
+      (sink (e/end))
+      nop)))
 
 (defn constant [value]
   (property

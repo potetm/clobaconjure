@@ -1,8 +1,9 @@
 (ns clobaconjure.event
   (:refer-clojure :exclude [next]))
 
-(defprotocol IMapEvent
-  (map-event [event f]))
+(defprotocol IEvent
+  (map-event [event f])
+  (apply-event [event value]))
 
 (defrecord Event [event?
                   value
@@ -11,11 +12,13 @@
                   end?
                   error?
                   has-value?]
-  IMapEvent
+  IEvent
   (map-event [event f]
     (if (:has-value? event)
-      (assoc event :value (f (:value event)) )
-      event)))
+      (assoc event :value (f (:value event)))
+      event))
+  (apply-event [event value]
+    (map-event event (constantly value))))
 
 (defn make-Event [map]
   (map->Event (assoc map :event? true)))

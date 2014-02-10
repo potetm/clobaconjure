@@ -135,3 +135,11 @@
     (expect-property-events
       (b/constant "wat")
       "wat")))
+
+(defasync combining
+  (testing "that properties can be combined"
+    (expect-property-events
+      (-> (b/sequentially 1 [1 2 3])
+          b/to-property
+          (b/combine (b/to-property (b/sequentially 1 [4 5 6])) +))
+      5 6 7 8 9)))
