@@ -16,7 +16,7 @@
 
 (defn verify-single-subscriber [-test-ctx src & events-expected]
   (let [done? (atom false)]
-    (with-timeout 100 done?
+    (with-timeout 75 done?
       (let [events-found (atom [])]
         (b/subscribe!
           src
@@ -25,7 +25,7 @@
               (verify-results -test-ctx done? src @events-found (or events-expected []))
               (swap! events-found conj (:value event)))))
         ;; TODO: Make this check done? and re-poll if necessary
-        (later 70
+        (later 65
           (verify-cleanup -test-ctx src))))))
 
 ;; TODO: Reintegrate this. It's a good test, but I don't want it run as part of other tests
