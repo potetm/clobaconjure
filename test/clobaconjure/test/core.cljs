@@ -143,3 +143,22 @@
           b/to-property
           (b/combine (b/to-property (b/sequentially 1 [4 5 6])) +))
       5 6 7 8 9)))
+
+(defasync changes
+  (testing "that changes pushes only changes"
+    (expect-stream-events
+      (-> (b/sequentially 1 [2 3])
+          (b/merge (b/constant 1))
+          b/to-property
+          b/changes)
+      2 3)))
+
+(defasync sampled-by
+  (testing "that it samples the property by the eventstream"
+    (expect-stream-events
+      (-> (b/sequentially 2 [1 2])
+          b/to-property
+          (b/sampled-by
+            (-> (b/repeatedly 3 ["bah!"])
+                (b/take 4))))
+      1 2 2 2)))

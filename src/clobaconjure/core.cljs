@@ -23,6 +23,7 @@
   (js/setTimeout f delay))
 
 (declare subscribe!
+         eventstream
          property)
 
 (defrecord EventStream [subscribe subscribers])
@@ -71,16 +72,34 @@
           (reset! unsub-right (subscribe! stream-right sink-right))
           unsub)))))
 
+(defn- combine-and-push [f val-left val-right sink event]
+  (sink (e/apply-event event (f val-left val-right))))
+
+(defn- left [left right]
+  left)
+
 (defprotocol IProperty
-  (combine [left right f]))
+  (changes [prop])
+  (combine [left right f])
+  (sampled-by [prop sampler] [prop sampler f]))
 
 (defrecord Property [subscribe subscribers]
   IProperty
+  (changes [prop]
+    (eventstream
+      (fn [sink]
+        (subscribe! prop
+                    (fn [event]
+                      (when-not (:initial? event)
+                        (sink event)))))))
   (combine [left right f]
-    (let [combine-and-push
-          (fn [val-left val-right sink event]
-            (sink (e/apply-event event (f val-left val-right))))]
-      (combine-properties left combine-and-push right combine-and-push))))
+    (let [combine-and-push (partial combine-and-push f)]
+      (combine-properties left combine-and-push right combine-and-push)))
+  (sampled-by [prop sampler]
+    (sampled-by prop sampler left))
+  (sampled-by [prop sampler f]
+    (let [push-prop-val (partial combine-and-push f)]
+      (combine-properties prop nop sampler push-prop-val))))
 
 (defn subscribe! [obs subscriber]
   ((:subscribe obs) subscriber))
